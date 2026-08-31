@@ -70,6 +70,28 @@
 
     <!-- Reading area: las palabras clickeables irán aquí (Etapa 1B) -->
     <section class="reading-section hidden" id="readingSection"></section>
+
+    <!-- Speech bar: Etapa 2 — Listening -->
+    <div class="speech-bar hidden" id="speechBar">
+      <div class="speech-controls">
+        <button class="speech-btn" id="playPauseBtn" aria-label="Reproducir">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21 5 3"/>
+          </svg>
+        </button>
+        <button class="speech-btn" id="stopBtn" aria-label="Detener">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+          </svg>
+        </button>
+        <select class="speech-select" id="speedSelect">
+          <option value="b2">B2 · 120 wpm</option>
+          <option value="c1" selected>C1 · 150 wpm</option>
+          <option value="native">Nativo · 180 wpm</option>
+        </select>
+        <select class="speech-select" id="voiceSelect"></select>
+      </div>
+    </div>
   </main>
 
   <!-- Settings Modal -->
@@ -121,6 +143,7 @@
   <script src="js/reading.js"></script>
   <script src="js/dictionary-api.js"></script>
   <script src="js/ocr-api.js"></script>
+  <script src="js/speech.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

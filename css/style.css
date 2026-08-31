@@ -687,3 +687,66 @@ body {
   animation: spin 0.65s linear infinite;
   flex-shrink: 0;
 }
+
+/* ── Speech bar ──────────────────────────────────────────── */
+.speech-bar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 1rem;
+}
+
+.speech-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.speech-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.speech-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.speech-btn--active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: rgba(212, 245, 33, 0.08);
+}
+
+.speech-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 0.42rem 0.55rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.speech-select:focus {
+  border-color: var(--accent);
+}
+
+/* word currently being narrated */
+.word--speaking {
+  background: rgba(212, 245, 33, 0.28);
+  color: var(--accent);
+}

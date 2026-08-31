@@ -20,6 +20,11 @@
   const ocrStatusMsg     = document.getElementById('ocrStatusMsg');
   const clearBtn         = document.getElementById('clearBtn');
   const translateBtn     = document.getElementById('translateBtn');
+  const speechBar        = document.getElementById('speechBar');
+  const playPauseBtn     = document.getElementById('playPauseBtn');
+  const stopBtn          = document.getElementById('stopBtn');
+  const speedSelect      = document.getElementById('speedSelect');
+  const voiceSelect      = document.getElementById('voiceSelect');
 
   // ── State ─────────────────────────────────────────────────
   let activeWordEl = null;
@@ -109,6 +114,9 @@
     translateBtn.textContent = 'Ver traducción';
     Reading.render(text);
     updateTranslateBtn();
+    Speech.stop();
+    updateSpeechUI();
+    updateSpeechBar();
 
     // Collapse textarea to give reading area more space
     textInput.rows = 4;
@@ -144,6 +152,9 @@
     translateBtn.disabled    = false;
     translateBtn.classList.add('hidden');
     clearBtn.classList.add('hidden');
+    Speech.stop();
+    updateSpeechUI();
+    updateSpeechBar();
     textInput.focus();
   }
 
@@ -265,6 +276,9 @@
       return;
     }
 
+    // Stop narration before replacing word spans with translation
+    if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
+
     // Show cached translation without re-fetching
     if (translationHtml !== null) {
       originalHtml             = readingSection.innerHTML;
@@ -307,6 +321,75 @@
         translateBtn.disabled = false;
       }
     }
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // Speech (Listening — Etapa 2)
+  // ─────────────────────────────────────────────────────────
+  const PLAY_ICON  = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+  const PAUSE_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`;
+
+  function updateSpeechBar() {
+    speechBar.classList.toggle('hidden', readingSection.classList.contains('hidden'));
+  }
+
+  function updateSpeechUI() {
+    const playing = Speech.isPlaying();
+    const active  = Speech.isActive();
+    playPauseBtn.innerHTML = playing ? PAUSE_ICON : PLAY_ICON;
+    playPauseBtn.setAttribute('aria-label', playing ? 'Pausar' : 'Reproducir');
+    playPauseBtn.classList.toggle('speech-btn--active', active);
+    stopBtn.classList.toggle('speech-btn--active', active);
+  }
+
+  function populateVoices() {
+    const voices = Speech.getEnglishVoices();
+    if (voices.length < 2) { voiceSelect.classList.add('hidden'); return; }
+    voiceSelect.classList.remove('hidden');
+    const prevVal = voiceSelect.value;
+    voiceSelect.innerHTML = voices
+      .map(v => `<option value="${esc(v.voiceURI)}">${esc(Speech.voiceLabel(v))}</option>`)
+      .join('');
+    if (prevVal && voices.some(v => v.voiceURI === prevVal)) {
+      voiceSelect.value = prevVal;
+    } else {
+      const usVoice = voices.find(v => v.lang === 'en-US');
+      if (usVoice) voiceSelect.value = usVoice.voiceURI;
+    }
+    Speech.setVoice(voices.find(v => v.voiceURI === voiceSelect.value) ?? null);
+  }
+
+  speechSynthesis.addEventListener('voiceschanged', populateVoices);
+  populateVoices();
+  Speech.setRate(speedSelect.value);
+  Speech.onEnd(updateSpeechUI);
+
+  speedSelect.addEventListener('change', () => Speech.setRate(speedSelect.value));
+
+  voiceSelect.addEventListener('change', () => {
+    const voices = Speech.getEnglishVoices();
+    Speech.setVoice(voices.find(v => v.voiceURI === voiceSelect.value) ?? null);
+  });
+
+  playPauseBtn.addEventListener('click', () => {
+    if (isShowingTranslation) {
+      readingSection.innerHTML = originalHtml;
+      isShowingTranslation = false;
+      translateBtn.textContent = 'Ver traducción';
+    }
+    if (Speech.isPaused()) {
+      Speech.resume();
+    } else if (Speech.isPlaying()) {
+      Speech.pause();
+    } else {
+      Speech.play(readingSection);
+    }
+    updateSpeechUI();
+  });
+
+  stopBtn.addEventListener('click', () => {
+    Speech.stop();
+    updateSpeechUI();
   });
 
   // ─────────────────────────────────────────────────────────
@@ -438,7 +521,11 @@
   // ─────────────────────────────────────────────────────────
   readingSection.addEventListener('click', async e => {
     const wordEl = e.target.closest('.word');
-    if (!wordEl || isFetching) return;
+    if (!wordEl) return;
+
+    if (Speech.isPlaying()) { Speech.pause(); updateSpeechUI(); }
+
+    if (isFetching) return;
 
     // Second click on the same word → close the sheet
     if (wordEl === activeWordEl) {
