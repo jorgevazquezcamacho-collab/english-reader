@@ -853,6 +853,59 @@ body {
   margin-top: 0.15rem;
 }
 
+/* ── Shadowing (Etapa 3, pieza 2) ────────────────────────── */
+.shadowing-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.75rem;
+  text-transform: uppercase;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.shadowing-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.shadowing-btn--recording {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.shadowing-btn--recording:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+.shadowing-status {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+/* word matched during shadowing */
+.word--shadowed-ok {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+}
+
+/* word not recognized during shadowing */
+.word--shadowed-miss {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
 /* ── Mobile (≤ 600 px) ───────────────────────────────────── */
 @media (max-width: 600px) {
 

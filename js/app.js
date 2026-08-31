@@ -27,6 +27,9 @@
   const stopBtn          = document.getElementById('stopBtn');
   const speedSelect      = document.getElementById('speedSelect');
   const voiceSelect      = document.getElementById('voiceSelect');
+  const shadowingBar    = document.getElementById('shadowingBar');
+  const shadowingBtn    = document.getElementById('shadowingBtn');
+  const shadowingStatus = document.getElementById('shadowingStatus');
 
   // ── State ─────────────────────────────────────────────────
   let activeWordEl = null;
@@ -35,6 +38,7 @@
   let originalHtml         = null; // tokenized innerHTML snapshot before translation
   let translationHtml      = null; // rendered translation (cached to avoid re-fetching)
   let isShowingTranslation = false;
+  let isShadowing = false;
 
   // ── HTML escape ───────────────────────────────────────────
   function esc(s) {
@@ -119,6 +123,10 @@
     Speech.stop();
     updateSpeechUI();
     updateSpeechBar();
+    if (isShadowing) { Shadowing.stopActive(); }
+    setShadowingIdle();
+    clearShadowingHighlights();
+    updateShadowingBar();
 
     // Collapse textarea to give reading area more space
     textInput.rows = 4;
@@ -159,6 +167,10 @@
     Speech.stop();
     updateSpeechUI();
     updateSpeechBar();
+    if (isShadowing) { Shadowing.stopActive(); }
+    setShadowingIdle();
+    clearShadowingHighlights();
+    updateShadowingBar();
     textInput.focus();
   }
 
@@ -294,6 +306,7 @@
 
     // Stop narration before replacing word spans with translation
     if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
+    if (isShadowing) { Shadowing.stopActive(); setShadowingIdle(); clearShadowingHighlights(); }
 
     // Show cached translation without re-fetching
     if (translationHtml !== null) {
@@ -406,6 +419,98 @@
   stopBtn.addEventListener('click', () => {
     Speech.stop();
     updateSpeechUI();
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // Shadowing (Etapa 3 — Speaking, pieza 2)
+  // ─────────────────────────────────────────────────────────
+  const MIC_ICON = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+     fill="none" stroke="currentColor" stroke-width="2"
+     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+    <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+    <line x1="12" y1="19" x2="12" y2="23"/>
+    <line x1="8" y1="23" x2="16" y2="23"/>
+  </svg>`;
+
+  function updateShadowingBar() {
+    const visible = !readingSection.classList.contains('hidden') && Shadowing.isSupported();
+    shadowingBar.classList.toggle('hidden', !visible);
+  }
+
+  function clearShadowingHighlights() {
+    readingSection.querySelectorAll('.word--shadowed-ok, .word--shadowed-miss')
+      .forEach(el => el.classList.remove('word--shadowed-ok', 'word--shadowed-miss'));
+  }
+
+  function setShadowingIdle() {
+    isShadowing = false;
+    shadowingBtn.classList.remove('shadowing-btn--recording');
+    shadowingBtn.innerHTML = `${MIC_ICON} Shadowing`;
+    shadowingStatus.textContent = '';
+  }
+
+  function setShadowingRecording() {
+    isShadowing = true;
+    shadowingBtn.classList.add('shadowing-btn--recording');
+    shadowingBtn.innerHTML = `<span class="pronunciation-btn__dot" aria-hidden="true"></span> Detener`;
+    shadowingStatus.textContent = 'Grabando…';
+  }
+
+  function processTranscript(transcript) {
+    const wordEls = Array.from(readingSection.querySelectorAll('.word'));
+    if (!wordEls.length) return;
+    const originalWords   = wordEls.map(el => el.dataset.word || el.textContent);
+    const recognizedWords = transcript.trim().split(/\s+/);
+    const matched = Shadowing.align(originalWords, recognizedWords);
+    clearShadowingHighlights();
+    wordEls.forEach((el, i) => {
+      el.classList.add(matched[i] ? 'word--shadowed-ok' : 'word--shadowed-miss');
+    });
+    const okCount = matched.filter(Boolean).length;
+    const pct = Math.round((okCount / wordEls.length) * 100);
+    shadowingStatus.textContent = `${pct}% reconocido (${okCount}/${wordEls.length} palabras)`;
+  }
+
+  shadowingBtn.addEventListener('click', async () => {
+    if (!Shadowing.isSupported()) return;
+
+    if (isShadowing) {
+      const transcript = await Shadowing.stop();
+      setShadowingIdle();
+      if (transcript.trim()) {
+        processTranscript(transcript);
+      } else {
+        shadowingStatus.textContent = 'No se detectó voz.';
+      }
+      return;
+    }
+
+    if (isShowingTranslation) {
+      readingSection.innerHTML = originalHtml;
+      isShowingTranslation = false;
+      translateBtn.textContent = 'Ver traducción';
+    }
+    if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
+    clearShadowingHighlights();
+
+    setShadowingRecording();
+    Shadowing.start(
+      wordCount => { shadowingStatus.textContent = `Grabando… (${wordCount} palabras)`; },
+      async () => {
+        const transcript = await Shadowing.stop();
+        setShadowingIdle();
+        if (transcript.trim()) {
+          processTranscript(transcript);
+        } else {
+          shadowingStatus.textContent = 'No se detectó voz.';
+        }
+      },
+      err => {
+        setShadowingIdle();
+        shadowingStatus.textContent = err.message;
+      }
+    );
   });
 
   // ─────────────────────────────────────────────────────────
