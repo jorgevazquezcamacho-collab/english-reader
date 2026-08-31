@@ -14,8 +14,10 @@
   const sheetOverlay     = document.getElementById('sheetOverlay');
   const sheetContent     = document.getElementById('sheetContent');
   const closeSheetBtn    = document.getElementById('closeSheet');
-  const photoBtn         = document.getElementById('photoBtn');
-  const photoInput       = document.getElementById('photoInput');
+  const cameraBtn        = document.getElementById('cameraBtn');
+  const uploadBtn        = document.getElementById('uploadBtn');
+  const cameraInput      = document.getElementById('cameraInput');
+  const uploadInput      = document.getElementById('uploadInput');
   const ocrStatus        = document.getElementById('ocrStatus');
   const ocrStatusMsg     = document.getElementById('ocrStatusMsg');
   const clearBtn         = document.getElementById('clearBtn');
@@ -134,9 +136,10 @@
   }
 
   function clearAll() {
-    textInput.value  = '';
-    textInput.rows   = 12;
-    photoInput.value = '';
+    textInput.value   = '';
+    textInput.rows    = 12;
+    cameraInput.value = '';
+    uploadInput.value = '';
     ocrStatus.classList.add('hidden');
     ocrStatus.classList.remove('ocr-status--error');
     closeSheet();
@@ -146,7 +149,8 @@
     originalHtml         = null;
     translationHtml      = null;
     isShowingTranslation = false;
-    photoBtn.disabled    = false;
+    cameraBtn.disabled   = false;
+    uploadBtn.disabled   = false;
     analyzeBtn.disabled  = false;
     translateBtn.textContent = 'Ver traducción';
     translateBtn.disabled    = false;
@@ -159,7 +163,8 @@
   }
 
   function setOcrBusy(on) {
-    photoBtn.disabled   = on;
+    cameraBtn.disabled  = on;
+    uploadBtn.disabled  = on;
     analyzeBtn.disabled = on;
     clearBtn.disabled   = on;
     if (on) {
@@ -172,7 +177,8 @@
   }
 
   function showOcrError(msg) {
-    photoBtn.disabled   = false;
+    cameraBtn.disabled  = false;
+    uploadBtn.disabled  = false;
     analyzeBtn.disabled = false;
     clearBtn.disabled   = false;
     ocrStatus.classList.remove('hidden');
@@ -185,18 +191,15 @@
 
   clearBtn.addEventListener('click', clearAll);
 
-  photoBtn.addEventListener('click', () => {
+  function triggerPhotoInput(inputEl) {
     if (!Storage.getApiKey()) { openSettings(); return; }
     ocrStatus.classList.add('hidden');
     ocrStatus.classList.remove('ocr-status--error');
-    photoInput.value = '';
-    photoInput.click();
-  });
+    inputEl.value = '';
+    inputEl.click();
+  }
 
-  photoInput.addEventListener('change', async () => {
-    const file = photoInput.files?.[0];
-    if (!file) return;
-
+  async function handlePhotoFile(file) {
     setOcrBusy(true);
     try {
       const text = await OcrApi.extractText(file);
@@ -213,6 +216,19 @@
         showOcrError(err.message);
       }
     }
+  }
+
+  cameraBtn.addEventListener('click', () => triggerPhotoInput(cameraInput));
+  uploadBtn.addEventListener('click',  () => triggerPhotoInput(uploadInput));
+
+  cameraInput.addEventListener('change', async () => {
+    const file = cameraInput.files?.[0];
+    if (file) await handlePhotoFile(file);
+  });
+
+  uploadInput.addEventListener('change', async () => {
+    const file = uploadInput.files?.[0];
+    if (file) await handlePhotoFile(file);
   });
 
   // ─────────────────────────────────────────────────────────
