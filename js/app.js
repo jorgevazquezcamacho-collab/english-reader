@@ -10,8 +10,28 @@
   const eyeIcon          = document.getElementById('eyeIcon');
   const analyzeBtn       = document.getElementById('analyzeBtn');
   const textInput        = document.getElementById('textInput');
+  const readingSection   = document.getElementById('readingSection');
+  const sheetOverlay     = document.getElementById('sheetOverlay');
+  const sheetContent     = document.getElementById('sheetContent');
+  const closeSheetBtn    = document.getElementById('closeSheet');
 
-  // ── Settings modal ────────────────────────────────────────
+  // ── State ─────────────────────────────────────────────────
+  let activeWordEl = null;
+  let isFetching   = false;
+  const cache      = new Map(); // word.toLowerCase() → definition object
+
+  // ── HTML escape ───────────────────────────────────────────
+  function esc(s) {
+    return String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Settings modal
+  // ─────────────────────────────────────────────────────────
   function openSettings() {
     apiKeyInput.value = Storage.getApiKey();
     settingsOverlay.classList.remove('hidden');
@@ -25,29 +45,28 @@
 
   openSettingsBtn.addEventListener('click', openSettings);
   closeSettingsBtn.addEventListener('click', closeSettings);
-
-  settingsOverlay.addEventListener('click', (e) => {
+  settingsOverlay.addEventListener('click', e => {
     if (e.target === settingsOverlay) closeSettings();
   });
 
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !settingsOverlay.classList.contains('hidden')) {
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!settingsOverlay.classList.contains('hidden')) {
       closeSettings();
+    } else if (sheetOverlay.classList.contains('is-open')) {
+      closeSheet();
     }
   });
 
-  // ── Save API key ──────────────────────────────────────────
   saveApiKeyBtn.addEventListener('click', () => {
     Storage.saveApiKey(apiKeyInput.value);
     saveFeedback.classList.remove('hidden');
     setTimeout(() => saveFeedback.classList.add('hidden'), 2000);
   });
 
-  // ── Toggle key visibility ─────────────────────────────────
   const EYE_OPEN = `
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
     <circle cx="12" cy="12" r="3"/>`;
-
   const EYE_CLOSED = `
     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8
              a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4
@@ -61,7 +80,9 @@
     eyeIcon.innerHTML = isPassword ? EYE_CLOSED : EYE_OPEN;
   });
 
-  // ── Analyze (placeholder) ─────────────────────────────────
+  // ─────────────────────────────────────────────────────────
+  // Analyze
+  // ─────────────────────────────────────────────────────────
   analyzeBtn.addEventListener('click', () => {
     const text = textInput.value.trim();
     if (!text) return;
@@ -71,7 +92,198 @@
       return;
     }
 
-    // TODO (Etapa 1B): pasar texto a reading.js para tokenizar y renderizar
-    console.log('[app] Analizar ->', text.slice(0, 60) + (text.length > 60 ? '…' : ''));
+    closeSheet();
+    cache.clear();
+    Reading.render(text);
+
+    // Collapse textarea to give reading area more space
+    textInput.rows = 4;
+    readingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // Bottom sheet
+  // ─────────────────────────────────────────────────────────
+  function openSheet() {
+    sheetOverlay.classList.add('is-open');
+  }
+
+  function closeSheet() {
+    sheetOverlay.classList.remove('is-open');
+    if (activeWordEl) {
+      activeWordEl.classList.remove('word--active', 'word--loading');
+      activeWordEl = null;
+    }
+  }
+
+  function setSheetLoading() {
+    sheetContent.innerHTML = '<div class="sheet-spinner"></div>';
+    openSheet();
+  }
+
+  function setSheetError(msg) {
+    sheetContent.innerHTML = `
+      <div class="sheet-error">
+        <strong>Error al consultar la API</strong>
+        <p>${esc(msg)}</p>
+      </div>`;
+  }
+
+  closeSheetBtn.addEventListener('click', closeSheet);
+  sheetOverlay.addEventListener('click', e => {
+    if (e.target === sheetOverlay) closeSheet();
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // Definition renderer
+  // ─────────────────────────────────────────────────────────
+  function renderDefinition(def) {
+    const translations = (def.translations ?? []).join(', ');
+
+    const verbHtml = (def.is_verb && def.verb_forms) ? `
+      <div class="card-section">
+        <h4 class="card-section__title">Formas verbales</h4>
+        <table class="verb-table">
+          <thead>
+            <tr><th>Base</th><th>Past</th><th>Past Participle</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>${esc(def.verb_forms.base)}</td>
+              <td>${esc(def.verb_forms.past)}</td>
+              <td>${esc(def.verb_forms.participle)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>` : '';
+
+    const usageItems = (def.usage ?? []).map(u => `
+      <div class="usage-item">
+        <span class="usage-tag">${esc(u.tag)}</span>
+        <p>${esc(u.text)}</p>
+      </div>`).join('');
+
+    const usageHtml = usageItems ? `
+      <div class="card-section">
+        <h4 class="card-section__title">Usos</h4>
+        ${usageItems}
+      </div>` : '';
+
+    const phrasalItems = (def.phrasal_verbs ?? []).map(pv => `
+      <div class="phrasal-item">
+        <strong>${esc(pv.verb)}</strong>
+        <span>${esc(pv.meaning)}</span>
+      </div>`).join('');
+
+    const phrasalHtml = phrasalItems ? `
+      <div class="card-section">
+        <h4 class="card-section__title">Phrasal verbs</h4>
+        ${phrasalItems}
+      </div>` : '';
+
+    const synonymItems = (def.synonyms ?? []).map(s => `
+      <div class="usage-item">
+        <span class="usage-tag">${esc(s.word)}</span>
+        <p>${esc(s.note)}</p>
+      </div>`).join('');
+
+    const synonymsHtml = synonymItems ? `
+      <div class="card-section">
+        <h4 class="card-section__title">Sinónimos</h4>
+        ${synonymItems}
+      </div>` : '';
+
+    const examplesHtml = (def.examples ?? []).map(ex => `
+      <div class="example-pair">
+        <p class="example-en">${esc(ex.en)}</p>
+        <p class="example-es">${esc(ex.es)}</p>
+      </div>`).join('');
+
+    const exSection = examplesHtml ? `
+      <div class="card-section">
+        <h4 class="card-section__title">Ejemplos</h4>
+        ${examplesHtml}
+      </div>` : '';
+
+    sheetContent.innerHTML = `
+      <div class="def-word-row">
+        <span class="def-word">${esc(def.word)}</span>
+      </div>
+      <div class="def-phonetics">
+        <span class="def-ipa">${esc(def.phonetic_ipa ?? '')}</span>
+        <span class="def-approx">≈ ${esc(def.phonetic_approx ?? '')}</span>
+      </div>
+      <div class="def-translations">${esc(translations)}</div>
+      ${verbHtml}
+      ${usageHtml}
+      ${phrasalHtml}
+      ${synonymsHtml}
+      ${exSection}
+      <div class="def-context">
+        <h4 class="def-context__title">En este texto</h4>
+        <p class="def-context__text">${esc(def.context_use ?? '')}</p>
+      </div>`;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Word click — event delegation on the reading section
+  // ─────────────────────────────────────────────────────────
+  readingSection.addEventListener('click', async e => {
+    const wordEl = e.target.closest('.word');
+    if (!wordEl || isFetching) return;
+
+    // Second click on the same word → close the sheet
+    if (wordEl === activeWordEl) {
+      closeSheet();
+      return;
+    }
+
+    // Deactivate the previous active word
+    if (activeWordEl) {
+      activeWordEl.classList.remove('word--active', 'word--loading');
+    }
+
+    activeWordEl  = wordEl;
+    const word    = wordEl.dataset.word;
+    const cacheKey = word.toLowerCase();
+
+    // Serve cached definition immediately
+    if (cache.has(cacheKey)) {
+      wordEl.classList.add('word--active');
+      renderDefinition(cache.get(cacheKey));
+      openSheet();
+      return;
+    }
+
+    // Fetch from Claude API
+    wordEl.classList.add('word--loading');
+    isFetching = true;
+    setSheetLoading();
+
+    try {
+      const context = Reading.getContext(wordEl);
+      const def     = await DictionaryApi.fetchDefinition(word, context);
+      cache.set(cacheKey, def);
+
+      // Guard: user may have clicked another word while this was fetching
+      if (activeWordEl === wordEl) {
+        wordEl.classList.replace('word--loading', 'word--active');
+        renderDefinition(def);
+      }
+    } catch (err) {
+      if (activeWordEl === wordEl) {
+        wordEl.classList.remove('word--loading', 'word--active');
+        activeWordEl = null;
+
+        if (err.code === 'NO_API_KEY') {
+          closeSheet();
+          openSettings();
+        } else {
+          setSheetError(err.message);
+        }
+      }
+    } finally {
+      isFetching = false;
+    }
   });
 })();
