@@ -417,6 +417,7 @@
 
   function closeSheet() {
     sheetOverlay.classList.remove('is-open');
+    Pronunciation.stopActive();
     if (activeWordEl) {
       activeWordEl.classList.remove('word--active', 'word--loading');
       activeWordEl = null;
@@ -512,6 +513,14 @@
         ${examplesHtml}
       </div>` : '';
 
+    const pronunciationHtml = Pronunciation.isSupported() ? `
+      <div class="pronunciation-wrap">
+        <button class="pronunciation-btn" id="pronunciationBtn">
+          <span aria-hidden="true">🎤</span> Practicar pronunciación
+        </button>
+        <div class="pronunciation-status" id="pronunciationStatus"></div>
+      </div>` : '';
+
     sheetContent.innerHTML = `
       <div class="def-word-row">
         <span class="def-word">${esc(def.word)}</span>
@@ -520,6 +529,7 @@
         <span class="def-ipa">${esc(def.phonetic_ipa ?? '')}</span>
         <span class="def-approx">≈ ${esc(def.phonetic_approx ?? '')}</span>
       </div>
+      ${pronunciationHtml}
       <div class="def-translations">${esc(translations)}</div>
       ${verbHtml}
       ${usageHtml}
@@ -530,6 +540,72 @@
         <h4 class="def-context__title">En este texto</h4>
         <p class="def-context__text">${esc(def.context_use ?? '')}</p>
       </div>`;
+
+    if (Pronunciation.isSupported()) wirePronunciation(def.word);
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // Pronunciation practice (Etapa 3 — Speaking, pieza 1)
+  // ─────────────────────────────────────────────────────────
+  function wirePronunciation(word) {
+    const btn    = document.getElementById('pronunciationBtn');
+    const status = document.getElementById('pronunciationStatus');
+    if (!btn || !status) return;
+
+    let stopFn = null;
+
+    function setIdle() {
+      btn.className = 'pronunciation-btn';
+      btn.innerHTML = '<span aria-hidden="true">🎤</span> Practicar pronunciación';
+    }
+
+    function setListening() {
+      btn.className = 'pronunciation-btn pronunciation-btn--listening';
+      btn.innerHTML = '<span class="pronunciation-btn__dot" aria-hidden="true"></span> Escuchando…';
+      status.innerHTML = '';
+    }
+
+    function showResult(result) {
+      setIdle();
+      if (result.matched) {
+        status.innerHTML = `
+          <div class="pronunciation-result pronunciation-result--ok">
+            <span class="pronunciation-result__icon" aria-hidden="true">✓</span>
+            <span class="pronunciation-result__text">¡Bien pronunciada!</span>
+          </div>`;
+      } else {
+        const heard = esc(result.heard || '(sin transcripción)');
+        status.innerHTML = `
+          <div class="pronunciation-result pronunciation-result--miss">
+            <span class="pronunciation-result__icon" aria-hidden="true">◎</span>
+            <div>
+              <p class="pronunciation-result__text">Entendí: <strong>${heard}</strong></p>
+              <p class="pronunciation-result__hint">Inténtalo de nuevo</p>
+            </div>
+          </div>`;
+      }
+    }
+
+    function showError(err) {
+      setIdle();
+      status.innerHTML = `<p class="pronunciation-result__hint">${esc(err.message)}</p>`;
+    }
+
+    btn.addEventListener('click', () => {
+      if (stopFn) {
+        // Second click while listening → cancel
+        stopFn();
+        stopFn = null;
+        setIdle();
+        return;
+      }
+      setListening();
+      stopFn = Pronunciation.listen(
+        word,
+        result => { stopFn = null; showResult(result); },
+        err    => { stopFn = null; showError(err); }
+      );
+    });
   }
 
   // ─────────────────────────────────────────────────────────

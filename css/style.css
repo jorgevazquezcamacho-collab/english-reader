@@ -759,6 +759,100 @@ body {
   color: var(--accent);
 }
 
+/* ── Pronunciation practice ──────────────────────────────── */
+.pronunciation-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pronunciation-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.4rem 0.75rem;
+  text-transform: uppercase;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.pronunciation-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.pronunciation-btn--listening {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.06);
+}
+
+.pronunciation-btn--listening:hover {
+  border-color: #ff6b6b;
+  color: #ff6b6b;
+}
+
+/* Pulsing red dot shown during active listening */
+.pronunciation-btn__dot {
+  width: 7px;
+  height: 7px;
+  background: #ff6b6b;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: pulse-dot 1s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1;    transform: scale(1); }
+  50%       { opacity: 0.3; transform: scale(0.65); }
+}
+
+.pronunciation-status {
+  /* collapses naturally when empty */
+}
+
+.pronunciation-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.pronunciation-result__icon {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  margin-top: 0.05rem;
+}
+
+.pronunciation-result--ok .pronunciation-result__icon,
+.pronunciation-result--ok .pronunciation-result__text {
+  color: #4ade80;
+}
+
+.pronunciation-result--miss .pronunciation-result__icon {
+  color: var(--text-muted);
+}
+
+.pronunciation-result--miss .pronunciation-result__text {
+  color: var(--text);
+}
+
+.pronunciation-result__hint {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
 /* ── Mobile (≤ 600 px) ───────────────────────────────────── */
 @media (max-width: 600px) {
 
