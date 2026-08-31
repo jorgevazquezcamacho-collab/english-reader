@@ -14,11 +14,20 @@
   const sheetOverlay     = document.getElementById('sheetOverlay');
   const sheetContent     = document.getElementById('sheetContent');
   const closeSheetBtn    = document.getElementById('closeSheet');
+  const photoBtn         = document.getElementById('photoBtn');
+  const photoInput       = document.getElementById('photoInput');
+  const ocrStatus        = document.getElementById('ocrStatus');
+  const ocrStatusMsg     = document.getElementById('ocrStatusMsg');
+  const clearBtn         = document.getElementById('clearBtn');
+  const translateBtn     = document.getElementById('translateBtn');
 
   // ── State ─────────────────────────────────────────────────
   let activeWordEl = null;
   let isFetching   = false;
   const cache      = new Map(); // word.toLowerCase() → definition object
+  let originalHtml         = null; // tokenized innerHTML snapshot before translation
+  let translationHtml      = null; // rendered translation (cached to avoid re-fetching)
+  let isShowingTranslation = false;
 
   // ── HTML escape ───────────────────────────────────────────
   function esc(s) {
@@ -94,11 +103,210 @@
 
     closeSheet();
     cache.clear();
+    originalHtml         = null;
+    translationHtml      = null;
+    isShowingTranslation = false;
+    translateBtn.textContent = 'Ver traducción';
     Reading.render(text);
+    updateTranslateBtn();
 
     // Collapse textarea to give reading area more space
     textInput.rows = 4;
     readingSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // Photo / OCR
+  // ─────────────────────────────────────────────────────────
+  function updateClearBtn() {
+    const hasText  = textInput.value.trim().length > 0;
+    const hasError = ocrStatus.classList.contains('ocr-status--error') &&
+                     !ocrStatus.classList.contains('hidden');
+    clearBtn.classList.toggle('hidden', !(hasText || hasError));
+  }
+
+  function clearAll() {
+    textInput.value  = '';
+    textInput.rows   = 12;
+    photoInput.value = '';
+    ocrStatus.classList.add('hidden');
+    ocrStatus.classList.remove('ocr-status--error');
+    closeSheet();
+    readingSection.classList.add('hidden');
+    readingSection.innerHTML = '';
+    cache.clear();
+    originalHtml         = null;
+    translationHtml      = null;
+    isShowingTranslation = false;
+    photoBtn.disabled    = false;
+    analyzeBtn.disabled  = false;
+    translateBtn.textContent = 'Ver traducción';
+    translateBtn.disabled    = false;
+    translateBtn.classList.add('hidden');
+    clearBtn.classList.add('hidden');
+    textInput.focus();
+  }
+
+  function setOcrBusy(on) {
+    photoBtn.disabled   = on;
+    analyzeBtn.disabled = on;
+    clearBtn.disabled   = on;
+    if (on) {
+      ocrStatus.classList.remove('hidden', 'ocr-status--error');
+      ocrStatusMsg.textContent = 'Analizando imagen...';
+    } else {
+      ocrStatus.classList.add('hidden');
+      ocrStatus.classList.remove('ocr-status--error');
+    }
+  }
+
+  function showOcrError(msg) {
+    photoBtn.disabled   = false;
+    analyzeBtn.disabled = false;
+    clearBtn.disabled   = false;
+    ocrStatus.classList.remove('hidden');
+    ocrStatus.classList.add('ocr-status--error');
+    ocrStatusMsg.textContent = msg;
+    updateClearBtn();
+  }
+
+  textInput.addEventListener('input', updateClearBtn);
+
+  clearBtn.addEventListener('click', clearAll);
+
+  photoBtn.addEventListener('click', () => {
+    if (!Storage.getApiKey()) { openSettings(); return; }
+    ocrStatus.classList.add('hidden');
+    ocrStatus.classList.remove('ocr-status--error');
+    photoInput.value = '';
+    photoInput.click();
+  });
+
+  photoInput.addEventListener('change', async () => {
+    const file = photoInput.files?.[0];
+    if (!file) return;
+
+    setOcrBusy(true);
+    try {
+      const text = await OcrApi.extractText(file);
+      textInput.value = text;
+      textInput.rows  = 12;
+      setOcrBusy(false);
+      textInput.focus();
+      updateClearBtn();
+    } catch (err) {
+      if (err.code === 'NO_API_KEY') {
+        setOcrBusy(false);
+        openSettings();
+      } else {
+        showOcrError(err.message);
+      }
+    }
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // Translation
+  // ─────────────────────────────────────────────────────────
+  function updateTranslateBtn() {
+    translateBtn.classList.toggle('hidden', readingSection.classList.contains('hidden'));
+  }
+
+  async function fetchTranslation(text) {
+    const apiKey = Storage.getApiKey();
+    if (!apiKey) {
+      const err = new Error('Sin API key');
+      err.code = 'NO_API_KEY';
+      throw err;
+    }
+    // Scale output budget to text length; cap at Haiku's max
+    const wordCount = text.trim().split(/\s+/).length;
+    const maxTokens = Math.min(8192, Math.max(2048, Math.ceil(wordCount * 1.5)));
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: maxTokens,
+        messages: [{
+          role: 'user',
+          content: `Translate the following English text to Spanish. Preserve paragraph structure exactly. Return only the translated text — no explanations, no notes.\n\n${text}`
+        }]
+      })
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    return (data.content?.[0]?.text ?? '').trim();
+  }
+
+  function renderTranslation(text) {
+    return text.split(/\n{2,}/)
+      .map(p => p.trim())
+      .filter(Boolean)
+      .map(p => `<p class="reading-para">${esc(p.replace(/\n/g, '<br>'))}</p>`)
+      .join('');
+  }
+
+  translateBtn.addEventListener('click', async () => {
+    // Toggle back to original tokenized view
+    if (isShowingTranslation) {
+      readingSection.innerHTML = originalHtml;
+      isShowingTranslation     = false;
+      translateBtn.textContent = 'Ver traducción';
+      return;
+    }
+
+    // Show cached translation without re-fetching
+    if (translationHtml !== null) {
+      originalHtml             = readingSection.innerHTML;
+      readingSection.innerHTML = translationHtml;
+      isShowingTranslation     = true;
+      translateBtn.textContent = 'Ver original';
+      return;
+    }
+
+    // New fetch — snapshot original HTML and show loading state
+    const sourceText = textInput.value.trim();
+    const wordCount  = sourceText.split(/\s+/).length;
+    originalHtml     = readingSection.innerHTML;
+
+    translateBtn.textContent = wordCount > 800
+      ? 'Traduciendo texto largo...'
+      : 'Traduciendo...';
+    translateBtn.disabled = true;
+
+    try {
+      const translated = await fetchTranslation(sourceText);
+      // Guard: user may have cleared while this was in flight
+      if (readingSection.classList.contains('hidden')) return;
+      translationHtml          = renderTranslation(translated);
+      readingSection.innerHTML = translationHtml;
+      isShowingTranslation     = true;
+      translateBtn.textContent = 'Ver original';
+    } catch (err) {
+      if (readingSection.classList.contains('hidden')) return;
+      if (err.code === 'NO_API_KEY') {
+        openSettings();
+      } else {
+        translateBtn.textContent = 'Error — reintentar';
+        setTimeout(() => {
+          if (!isShowingTranslation) translateBtn.textContent = 'Ver traducción';
+        }, 2500);
+      }
+    } finally {
+      if (!readingSection.classList.contains('hidden')) {
+        translateBtn.disabled = false;
+      }
+    }
   });
 
   // ─────────────────────────────────────────────────────────

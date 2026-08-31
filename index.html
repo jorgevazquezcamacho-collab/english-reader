@@ -42,7 +42,30 @@
         rows="12"
         spellcheck="false"
       ></textarea>
-      <button class="btn btn--primary" id="analyzeBtn">Analizar</button>
+      <div class="input-actions">
+        <button class="btn btn--primary" id="analyzeBtn">Analizar</button>
+        <button class="btn btn--secondary" id="photoBtn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+          Subir foto
+        </button>
+        <!-- capture="environment" opens the back camera directly on mobile -->
+        <input type="file" id="photoInput" accept="image/*" capture="environment" class="sr-only" />
+        <button class="btn btn--ghost hidden" id="clearBtn" aria-label="Limpiar todo">
+          Limpiar
+        </button>
+        <button class="btn btn--ghost hidden" id="translateBtn">
+          Ver traducción
+        </button>
+      </div>
+      <div class="ocr-status hidden" id="ocrStatus">
+        <div class="ocr-spinner"></div>
+        <span id="ocrStatusMsg"></span>
+      </div>
     </section>
 
     <!-- Reading area: las palabras clickeables irán aquí (Etapa 1B) -->
@@ -97,6 +120,7 @@
   <script src="js/storage.js"></script>
   <script src="js/reading.js"></script>
   <script src="js/dictionary-api.js"></script>
+  <script src="js/ocr-api.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
