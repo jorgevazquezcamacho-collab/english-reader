@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>English Reader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <h1 class="header__title">English Reader</h1>
+    <button class="header__settings-btn" id="openSettings" aria-label="Abrir ajustes">
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06
+                 a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09
+                 A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83
+                 l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09
+                 A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83
+                 l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09
+                 a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83
+                 l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09
+                 a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Main -->
+  <main class="main">
+    <section class="input-section">
+      <label class="input-section__label" for="textInput">Pega tu texto en inglés</label>
+      <textarea
+        class="input-section__textarea"
+        id="textInput"
+        placeholder="Paste any English text here..."
+        rows="12"
+        spellcheck="false"
+      ></textarea>
+      <button class="btn btn--primary" id="analyzeBtn">Analizar</button>
+    </section>
+
+    <!-- Reading area: las palabras clickeables irán aquí (Etapa 1B) -->
+    <section class="reading-section hidden" id="readingSection"></section>
+  </main>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay hidden" id="settingsOverlay"
+       role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="modal">
+      <div class="modal__header">
+        <h2 class="modal__title" id="settingsTitle">Ajustes</h2>
+        <button class="modal__close" id="closeSettings" aria-label="Cerrar ajustes">&times;</button>
+      </div>
+      <div class="modal__body">
+        <label class="form-label" for="apiKeyInput">API Key de Claude</label>
+        <p class="form-hint">Se guarda solo en tu navegador (localStorage). Nunca se sube al repositorio.</p>
+        <div class="api-key-wrapper">
+          <input
+            class="form-input"
+            type="password"
+            id="apiKeyInput"
+            placeholder="sk-ant-..."
+            autocomplete="off"
+          />
+          <button class="btn-icon" id="toggleKeyVisibility" aria-label="Mostrar u ocultar key">
+            <svg id="eyeIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18"
+                 viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <div class="modal__actions">
+          <button class="btn btn--primary" id="saveApiKeyBtn">Guardar</button>
+          <span class="save-feedback hidden" id="saveFeedback">Guardado ✓</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/storage.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
