@@ -758,3 +758,76 @@ body {
   background: rgba(212, 245, 33, 0.28);
   color: var(--accent);
 }
+
+/* ── Mobile (≤ 600 px) ───────────────────────────────────── */
+@media (max-width: 600px) {
+
+  /* Header */
+  .header {
+    padding: 0.75rem 1rem;
+  }
+
+  /* Main layout: menos aire alrededor */
+  .main {
+    padding: 1rem 0.875rem;
+    gap: 1rem;
+  }
+
+  /* Texto de lectura: la reducción más visible */
+  .reading-section {
+    font-size: 0.93rem;
+    line-height: 1.72;
+    padding: 1rem 1rem;
+  }
+
+  /* Botones: padding horizontal más ajustado */
+  .btn {
+    padding: 0.6rem 1rem;
+  }
+
+  .btn--ghost {
+    padding: 0.6rem 0.5rem;
+  }
+
+  /* El separador vertical entre Analizar y los botones de foto
+     puede quedar colgado cuando los items hacen wrap; se oculta */
+  .input-actions__sep {
+    display: none;
+  }
+
+  /* Modal de Ajustes: ocupa casi todo el ancho y tiene menos padding */
+  .modal {
+    padding: 1.25rem;
+    border-radius: var(--radius-md);
+  }
+
+  /* Bottom-sheet: más alto (más contenido visible) y menos padding lateral */
+  .sheet {
+    max-height: 85vh;
+    padding: 0.75rem 1rem 1.75rem;
+  }
+
+  /* Ficha de palabra: encabezado más compacto */
+  .def-word {
+    font-size: 1.2rem;
+  }
+
+  .def-phonetics {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+  }
+
+  .def-translations {
+    font-size: 0.93rem;
+  }
+
+  /* Barra de speech: padding reducido */
+  .speech-bar {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .speech-select {
+    font-size: 0.72rem;
+    padding: 0.38rem 0.45rem;
+  }
+}
