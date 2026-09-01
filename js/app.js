@@ -30,6 +30,13 @@
   const shadowingBar    = document.getElementById('shadowingBar');
   const shadowingBtn    = document.getElementById('shadowingBtn');
   const shadowingStatus = document.getElementById('shadowingStatus');
+  const summaryBar        = document.getElementById('summaryBar');
+  const summaryBtn        = document.getElementById('summaryBtn');
+  const summaryStatus     = document.getElementById('summaryStatus');
+  const summaryReview     = document.getElementById('summaryReview');
+  const summaryTranscript = document.getElementById('summaryTranscript');
+  const summaryRetryBtn   = document.getElementById('summaryRetryBtn');
+  const summarySendBtn    = document.getElementById('summarySendBtn');
 
   // ── State ─────────────────────────────────────────────────
   let activeWordEl = null;
@@ -39,6 +46,8 @@
   let translationHtml      = null; // rendered translation (cached to avoid re-fetching)
   let isShowingTranslation = false;
   let isShadowing = false;
+  let isSummaryRecording = false;
+  let summaryTranscriptText = '';
 
   // ── HTML escape ───────────────────────────────────────────
   function esc(s) {
@@ -127,6 +136,8 @@
     setShadowingIdle();
     clearShadowingHighlights();
     updateShadowingBar();
+    stopSummaryActive();
+    updateSummaryBar();
 
     // Collapse textarea to give reading area more space
     textInput.rows = 4;
@@ -171,6 +182,8 @@
     setShadowingIdle();
     clearShadowingHighlights();
     updateShadowingBar();
+    stopSummaryActive();
+    updateSummaryBar();
     textInput.focus();
   }
 
@@ -493,6 +506,7 @@
     }
     if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
     clearShadowingHighlights();
+    stopSummaryActive();
 
     setShadowingRecording();
     Shadowing.start(
@@ -512,6 +526,166 @@
       }
     );
   });
+
+  // ─────────────────────────────────────────────────────────
+  // Spoken summary (Etapa 3 — Speaking, pieza 3)
+  // Reuses the Shadowing module's recognition engine (start/stop/stopActive)
+  // — it's already a generic continuous=false-with-restart recorder, only
+  // its align()/normalize() helpers are shadowing-specific.
+  // ─────────────────────────────────────────────────────────
+  function updateSummaryBar() {
+    const visible = !readingSection.classList.contains('hidden') && Shadowing.isSupported();
+    summaryBar.classList.toggle('hidden', !visible);
+  }
+
+  function hideSummaryReview() {
+    summaryReview.classList.add('hidden');
+    summaryTranscript.textContent = '';
+    summaryTranscriptText = '';
+  }
+
+  function setSummaryIdle() {
+    isSummaryRecording = false;
+    summaryBtn.classList.remove('shadowing-btn--recording');
+    summaryBtn.innerHTML = `${MIC_ICON} Resumir en voz alta`;
+    summaryStatus.textContent = '';
+  }
+
+  function setSummaryRecording() {
+    isSummaryRecording = true;
+    summaryBtn.classList.add('shadowing-btn--recording');
+    summaryBtn.innerHTML = `<span class="pronunciation-btn__dot" aria-hidden="true"></span> Detener`;
+    summaryStatus.textContent = 'Grabando…';
+  }
+
+  function showSummaryReview(transcript) {
+    setSummaryIdle();
+    summaryStatus.textContent = 'Listo. Revisa tu resumen abajo.';
+    summaryTranscriptText = transcript;
+    summaryTranscript.textContent = transcript;
+    summaryReview.classList.remove('hidden');
+  }
+
+  // Cancels any in-flight recording and clears the review panel — used when
+  // navigating away (new text, clear, or switching to shadowing) so the two
+  // features never fight over the shared recognition engine.
+  function stopSummaryActive() {
+    if (isSummaryRecording) { Shadowing.stopActive(); }
+    setSummaryIdle();
+    hideSummaryReview();
+  }
+
+  summaryBtn.addEventListener('click', () => {
+    if (!Shadowing.isSupported()) return;
+
+    if (isSummaryRecording) {
+      Shadowing.stop().then(transcript => {
+        setSummaryIdle();
+        if (transcript.trim()) {
+          showSummaryReview(transcript.trim());
+        } else {
+          summaryStatus.textContent = 'No se detectó voz.';
+        }
+      });
+      return;
+    }
+
+    if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
+    if (isShadowing) { Shadowing.stopActive(); setShadowingIdle(); clearShadowingHighlights(); }
+    hideSummaryReview();
+
+    setSummaryRecording();
+    Shadowing.start(
+      wordCount => { summaryStatus.textContent = `Grabando… (${wordCount} palabras)`; },
+      null,
+      err => {
+        setSummaryIdle();
+        summaryStatus.textContent = err.message;
+      }
+    );
+  });
+
+  summaryRetryBtn.addEventListener('click', () => {
+    hideSummaryReview();
+    setSummaryIdle();
+  });
+
+  summarySendBtn.addEventListener('click', async () => {
+    if (!Storage.getApiKey()) { openSettings(); return; }
+    const sourceText = textInput.value.trim();
+    const transcript = summaryTranscriptText;
+    if (!sourceText || !transcript) return;
+
+    summarySendBtn.disabled  = true;
+    summaryRetryBtn.disabled = true;
+    setSheetLoading();
+
+    try {
+      const feedback = await SummaryApi.fetchFeedback(sourceText, transcript);
+      renderSummaryFeedback(feedback);
+    } catch (err) {
+      if (err.code === 'NO_API_KEY') {
+        closeSheet();
+        openSettings();
+      } else {
+        setSheetError(err.message);
+      }
+    } finally {
+      summarySendBtn.disabled  = false;
+      summaryRetryBtn.disabled = false;
+    }
+  });
+
+  function renderSummaryFeedback(fb) {
+    const scoreKey    = (fb.comprehension_score || '').toLowerCase();
+    const scoreLabels = { alta: 'Alta', media: 'Media', baja: 'Baja' };
+    const scoreClasses = {
+      alta:  'summary-score--high',
+      media: 'summary-score--mid',
+      baja:  'summary-score--low'
+    };
+    const scoreLabel = scoreLabels[scoreKey] ?? esc(fb.comprehension_score ?? '—');
+    const scoreClass = scoreClasses[scoreKey] ?? '';
+
+    const grammarItems = (fb.grammar_notes ?? []).map(g => `
+      <div class="usage-item">
+        <span class="usage-tag">${esc(g.error)} → ${esc(g.correction)}</span>
+        <p>${esc(g.explanation)}</p>
+      </div>`).join('');
+
+    const grammarHtml = grammarItems ? `
+      <div class="card-section">
+        <h4 class="card-section__title">Gramática</h4>
+        ${grammarItems}
+      </div>` : '';
+
+    const vocabItems = (fb.vocabulary_suggestions ?? []).map(v => `
+      <div class="usage-item">
+        <span class="usage-tag">${esc(v.used)} → ${esc(v.suggestion)}</span>
+        <p>${esc(v.note)}</p>
+      </div>`).join('');
+
+    const vocabHtml = vocabItems ? `
+      <div class="card-section">
+        <h4 class="card-section__title">Vocabulario</h4>
+        ${vocabItems}
+      </div>` : '';
+
+    sheetContent.innerHTML = `
+      <div class="def-word-row">
+        <span class="def-word">Tu resumen — feedback</span>
+      </div>
+      <div class="summary-score ${scoreClass}">
+        <span class="summary-score__label">Comprensión</span>
+        <span class="summary-score__value">${esc(scoreLabel)}</span>
+      </div>
+      ${grammarHtml}
+      ${vocabHtml}
+      <div class="def-context">
+        <h4 class="def-context__title">Nota final</h4>
+        <p class="def-context__text">${esc(fb.encouragement ?? '')}</p>
+      </div>`;
+  }
 
   // ─────────────────────────────────────────────────────────
   // Bottom sheet

@@ -906,6 +906,68 @@ body {
   color: #fbbf24;
 }
 
+/* ── Spoken summary (Etapa 3, pieza 3) ───────────────────── */
+.summary-review {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.summary-review__label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.summary-review__text {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.8rem;
+}
+
+.summary-review__actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.summary-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.9rem;
+}
+
+.summary-score__label {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.summary-score__value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.85rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.summary-score--high .summary-score__value { color: #4ade80; }
+.summary-score--mid  .summary-score__value { color: #fbbf24; }
+.summary-score--low  .summary-score__value { color: #ff6b6b; }
+
 /* ── Mobile (≤ 600 px) ───────────────────────────────────── */
 @media (max-width: 600px) {
 

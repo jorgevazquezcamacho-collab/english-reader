@@ -121,6 +121,32 @@
         <span class="shadowing-status" id="shadowingStatus"></span>
       </div>
     </div>
+
+    <!-- Summary bar: Etapa 3 — Resumen libre hablado -->
+    <div class="speech-bar hidden" id="summaryBar">
+      <div class="speech-controls">
+        <button class="shadowing-btn" id="summaryBtn" aria-label="Grabar resumen hablado">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+          Resumir en voz alta
+        </button>
+        <span class="shadowing-status" id="summaryStatus"></span>
+      </div>
+      <div class="summary-review hidden" id="summaryReview">
+        <p class="summary-review__label">Tu resumen</p>
+        <p class="summary-review__text" id="summaryTranscript"></p>
+        <div class="summary-review__actions">
+          <button class="btn btn--secondary" id="summaryRetryBtn">Grabar de nuevo</button>
+          <button class="btn btn--primary" id="summarySendBtn">Enviar para feedback</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- Settings Modal -->
@@ -175,6 +201,7 @@
   <script src="js/speech.js"></script>
   <script src="js/shadowing.js"></script>
   <script src="js/pronunciation.js"></script>
+  <script src="js/summary-api.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
