@@ -37,6 +37,21 @@
   const summaryTranscript = document.getElementById('summaryTranscript');
   const summaryRetryBtn   = document.getElementById('summaryRetryBtn');
   const summarySendBtn    = document.getElementById('summarySendBtn');
+  const conversationBar          = document.getElementById('conversationBar');
+  const conversationStartBtn     = document.getElementById('conversationStartBtn');
+  const conversationStatus       = document.getElementById('conversationStatus');
+  const conversationPanel        = document.getElementById('conversationPanel');
+  const conversationTurnLabel    = document.getElementById('conversationTurnLabel');
+  const conversationQuestionText = document.getElementById('conversationQuestionText');
+  const conversationListenBtn    = document.getElementById('conversationListenBtn');
+  const conversationAnswerBtn    = document.getElementById('conversationAnswerBtn');
+  const conversationReview       = document.getElementById('conversationReview');
+  const conversationTranscriptEl = document.getElementById('conversationTranscript');
+  const conversationRetryBtn     = document.getElementById('conversationRetryBtn');
+  const conversationSendBtn      = document.getElementById('conversationSendBtn');
+  const conversationFeedback     = document.getElementById('conversationFeedback');
+  const conversationFeedbackText = document.getElementById('conversationFeedbackText');
+  const conversationEndBtn       = document.getElementById('conversationEndBtn');
 
   // ── State ─────────────────────────────────────────────────
   let activeWordEl = null;
@@ -48,6 +63,11 @@
   let isShadowing = false;
   let isSummaryRecording = false;
   let summaryTranscriptText = '';
+  let isConversationRecording   = false;
+  let conversationHistory       = []; // [{ question, answer, feedback }] — in-memory only
+  let conversationCurrentQuestion = '';
+  let conversationTurnNumber    = 0;
+  let conversationTranscriptText = '';
 
   // ── HTML escape ───────────────────────────────────────────
   function esc(s) {
@@ -138,6 +158,8 @@
     updateShadowingBar();
     stopSummaryActive();
     updateSummaryBar();
+    stopConversationActive();
+    updateConversationBar();
 
     // Collapse textarea to give reading area more space
     textInput.rows = 4;
@@ -184,6 +206,8 @@
     updateShadowingBar();
     stopSummaryActive();
     updateSummaryBar();
+    stopConversationActive();
+    updateConversationBar();
     textInput.focus();
   }
 
@@ -507,6 +531,7 @@
     if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
     clearShadowingHighlights();
     stopSummaryActive();
+    stopConversationActive();
 
     setShadowingRecording();
     Shadowing.start(
@@ -592,6 +617,7 @@
 
     if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
     if (isShadowing) { Shadowing.stopActive(); setShadowingIdle(); clearShadowingHighlights(); }
+    stopConversationActive();
     hideSummaryReview();
 
     setSummaryRecording();
@@ -686,6 +712,226 @@
         <p class="def-context__text">${esc(fb.encouragement ?? '')}</p>
       </div>`;
   }
+
+  // ─────────────────────────────────────────────────────────
+  // Guided conversation (Etapa 3 — Speaking, pieza 4)
+  // Also reuses Shadowing.start/stop/stopActive for recording answers, and
+  // Speech.play for the optional "listen to the question" button.
+  // ─────────────────────────────────────────────────────────
+  function updateConversationBar() {
+    const visible = !readingSection.classList.contains('hidden') && Shadowing.isSupported();
+    conversationBar.classList.toggle('hidden', !visible);
+  }
+
+  function setConversationAnswerIdle() {
+    isConversationRecording = false;
+    conversationAnswerBtn.classList.remove('shadowing-btn--recording');
+    conversationAnswerBtn.innerHTML = `${MIC_ICON} Responder`;
+  }
+
+  function setConversationAnswerRecording() {
+    isConversationRecording = true;
+    conversationAnswerBtn.classList.add('shadowing-btn--recording');
+    conversationAnswerBtn.innerHTML = `<span class="pronunciation-btn__dot" aria-hidden="true"></span> Detener`;
+  }
+
+  function hideConversationReview() {
+    conversationReview.classList.add('hidden');
+    conversationTranscriptEl.textContent = '';
+    conversationTranscriptText = '';
+  }
+
+  function showConversationReview(transcript) {
+    conversationTranscriptText = transcript;
+    conversationTranscriptEl.textContent = transcript;
+    conversationReview.classList.remove('hidden');
+  }
+
+  function showConversationQuestion(text, turnNumber) {
+    conversationCurrentQuestion = text;
+    conversationTurnNumber      = turnNumber;
+    conversationTurnLabel.textContent  = String(turnNumber);
+    conversationQuestionText.textContent = text;
+    hideConversationReview();
+    setConversationAnswerIdle();
+  }
+
+  // Resets the whole feature back to its starting state — used both by
+  // "Terminar conversación" and defensively whenever another feature
+  // (analyze, clear, shadowing, summary) needs the recognition engine.
+  function resetConversationUI() {
+    conversationHistory         = [];
+    conversationCurrentQuestion = '';
+    conversationTurnNumber      = 0;
+    isConversationRecording     = false;
+    conversationPanel.classList.add('hidden');
+    conversationReview.classList.add('hidden');
+    conversationFeedback.classList.add('hidden');
+    conversationQuestionText.textContent = '';
+    conversationTranscriptEl.textContent = '';
+    conversationTranscriptText  = '';
+    conversationStatus.textContent = '';
+    conversationStartBtn.classList.remove('hidden');
+    conversationStartBtn.disabled = false;
+    setConversationAnswerIdle();
+  }
+
+  function stopConversationActive() {
+    if (isConversationRecording) { Shadowing.stopActive(); }
+    resetConversationUI();
+  }
+
+  conversationStartBtn.addEventListener('click', async () => {
+    if (!Storage.getApiKey()) { openSettings(); return; }
+    const sourceText = textInput.value.trim();
+    if (!sourceText) return;
+
+    if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
+    if (isShadowing) { Shadowing.stopActive(); setShadowingIdle(); clearShadowingHighlights(); }
+    stopSummaryActive();
+
+    conversationHistory = [];
+    conversationStartBtn.disabled  = true;
+    conversationStatus.textContent = 'Generando pregunta…';
+
+    try {
+      const question = await ConversationApi.fetchFirstQuestion(sourceText);
+      conversationStartBtn.classList.add('hidden');
+      conversationStatus.textContent = '';
+      conversationPanel.classList.remove('hidden');
+      showConversationQuestion(question, 1);
+    } catch (err) {
+      if (err.code === 'NO_API_KEY') {
+        openSettings();
+      } else {
+        conversationStatus.textContent = err.message;
+      }
+    } finally {
+      conversationStartBtn.disabled = false;
+    }
+  });
+
+  conversationListenBtn.addEventListener('click', () => {
+    if (!conversationCurrentQuestion) return;
+    if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
+    const temp = document.createElement('span');
+    temp.textContent = conversationCurrentQuestion;
+    Speech.play(temp);
+    updateSpeechUI();
+  });
+
+  conversationAnswerBtn.addEventListener('click', () => {
+    if (!Shadowing.isSupported()) return;
+
+    if (isConversationRecording) {
+      Shadowing.stop().then(transcript => {
+        setConversationAnswerIdle();
+        if (transcript.trim()) {
+          showConversationReview(transcript.trim());
+        } else {
+          conversationStatus.textContent = 'No se detectó voz.';
+        }
+      });
+      return;
+    }
+
+    if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
+    if (isShadowing) { Shadowing.stopActive(); setShadowingIdle(); clearShadowingHighlights(); }
+    stopSummaryActive();
+    hideConversationReview();
+    conversationStatus.textContent = '';
+
+    setConversationAnswerRecording();
+    Shadowing.start(
+      wordCount => { conversationStatus.textContent = `Grabando… (${wordCount} palabras)`; },
+      null,
+      err => {
+        setConversationAnswerIdle();
+        conversationStatus.textContent = err.message;
+      }
+    );
+  });
+
+  conversationRetryBtn.addEventListener('click', () => {
+    hideConversationReview();
+    setConversationAnswerIdle();
+  });
+
+  conversationEndBtn.addEventListener('click', () => {
+    stopConversationActive();
+  });
+
+  function renderConversationSummary(lastAnswerFeedback, summary) {
+    sheetContent.innerHTML = `
+      <div class="def-word-row">
+        <span class="def-word">Cómo te fue en la conversación</span>
+      </div>
+      <div class="card-section">
+        <h4 class="card-section__title">Tu última respuesta</h4>
+        <p class="def-context__text">${esc(lastAnswerFeedback ?? '')}</p>
+      </div>
+      <div class="card-section">
+        <h4 class="card-section__title">Fluidez</h4>
+        <p class="def-context__text">${esc(summary.fluency_note ?? '')}</p>
+      </div>
+      <div class="card-section">
+        <h4 class="card-section__title">Gramática</h4>
+        <p class="def-context__text">${esc(summary.grammar_note ?? '')}</p>
+      </div>
+      <div class="card-section">
+        <h4 class="card-section__title">Qué tan completas fueron tus respuestas</h4>
+        <p class="def-context__text">${esc(summary.completeness_note ?? '')}</p>
+      </div>
+      <div class="def-context">
+        <h4 class="def-context__title">Nota final</h4>
+        <p class="def-context__text">${esc(summary.encouragement ?? '')}</p>
+      </div>`;
+  }
+
+  conversationSendBtn.addEventListener('click', async () => {
+    if (!Storage.getApiKey()) { openSettings(); return; }
+    const sourceText = textInput.value.trim();
+    const answer     = conversationTranscriptText;
+    if (!sourceText || !answer) return;
+
+    conversationSendBtn.disabled   = true;
+    conversationRetryBtn.disabled  = true;
+    conversationStatus.textContent = 'Enviando…';
+
+    try {
+      const result = await ConversationApi.fetchTurnResult(
+        sourceText, conversationHistory, conversationCurrentQuestion, answer, conversationTurnNumber
+      );
+
+      conversationHistory.push({
+        question: conversationCurrentQuestion,
+        answer,
+        feedback: result.feedback_breve
+      });
+      hideConversationReview();
+      conversationStatus.textContent = '';
+
+      if (result.conversation_summary) {
+        conversationPanel.classList.add('hidden');
+        renderConversationSummary(result.feedback_breve, result.conversation_summary);
+        openSheet();
+        resetConversationUI();
+      } else {
+        conversationFeedbackText.textContent = result.feedback_breve ?? '';
+        conversationFeedback.classList.remove('hidden');
+        showConversationQuestion(result.next_question ?? '', conversationTurnNumber + 1);
+      }
+    } catch (err) {
+      if (err.code === 'NO_API_KEY') {
+        openSettings();
+      } else {
+        conversationStatus.textContent = err.message;
+      }
+    } finally {
+      conversationSendBtn.disabled  = false;
+      conversationRetryBtn.disabled = false;
+    }
+  });
 
   // ─────────────────────────────────────────────────────────
   // Bottom sheet

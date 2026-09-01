@@ -968,6 +968,55 @@ body {
 .summary-score--mid  .summary-score__value { color: #fbbf24; }
 .summary-score--low  .summary-score__value { color: #ff6b6b; }
 
+/* ── Guided conversation (Etapa 3, pieza 4) ──────────────── */
+.conversation-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+
+.conversation-question {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.conversation-question__label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.conversation-question__text {
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+.conversation-question__actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.conversation-feedback {
+  background: rgba(212, 245, 33, 0.05);
+  border: 1px solid rgba(212, 245, 33, 0.18);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.8rem;
+}
+
+.conversation-feedback__text {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
 /* ── Mobile (≤ 600 px) ───────────────────────────────────── */
 @media (max-width: 600px) {
 
