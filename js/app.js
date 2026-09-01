@@ -52,6 +52,10 @@
   const conversationFeedback     = document.getElementById('conversationFeedback');
   const conversationFeedbackText = document.getElementById('conversationFeedbackText');
   const conversationEndBtn       = document.getElementById('conversationEndBtn');
+  const liveListenBtn = document.getElementById('liveListenBtn');
+  const liveClearBtn  = document.getElementById('liveClearBtn');
+  const liveStatus    = document.getElementById('liveStatus');
+  const liveList      = document.getElementById('liveList');
 
   // ── State ─────────────────────────────────────────────────
   let activeWordEl = null;
@@ -68,6 +72,11 @@
   let conversationCurrentQuestion = '';
   let conversationTurnNumber    = 0;
   let conversationTranscriptText = '';
+  let isLiveListening = false;
+  let liveEntries      = []; // in-memory only — [{ id, en, es, error }]
+  let liveQueue         = [];
+  let liveProcessing    = false;
+  let liveIdSeq         = 0;
 
   // ── HTML escape ───────────────────────────────────────────
   function esc(s) {
@@ -532,6 +541,7 @@
     clearShadowingHighlights();
     stopSummaryActive();
     stopConversationActive();
+    stopLiveListen();
 
     setShadowingRecording();
     Shadowing.start(
@@ -618,6 +628,7 @@
     if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
     if (isShadowing) { Shadowing.stopActive(); setShadowingIdle(); clearShadowingHighlights(); }
     stopConversationActive();
+    stopLiveListen();
     hideSummaryReview();
 
     setSummaryRecording();
@@ -789,6 +800,7 @@
     if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
     if (isShadowing) { Shadowing.stopActive(); setShadowingIdle(); clearShadowingHighlights(); }
     stopSummaryActive();
+    stopLiveListen();
 
     conversationHistory = [];
     conversationStartBtn.disabled  = true;
@@ -838,6 +850,7 @@
     if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
     if (isShadowing) { Shadowing.stopActive(); setShadowingIdle(); clearShadowingHighlights(); }
     stopSummaryActive();
+    stopLiveListen();
     hideConversationReview();
     conversationStatus.textContent = '';
 
@@ -931,6 +944,123 @@
       conversationSendBtn.disabled  = false;
       conversationRetryBtn.disabled = false;
     }
+  });
+
+  // ─────────────────────────────────────────────────────────
+  // Live listen & translate (Etapa 4)
+  // Independent of the pasted/analyzed text — works from page load.
+  // Each finished phrase queues a single short translation call; the queue
+  // is drained one at a time so fast speech never sends overlapping
+  // requests that could resolve out of order.
+  // ─────────────────────────────────────────────────────────
+  function setLiveIdle() {
+    isLiveListening = false;
+    liveListenBtn.classList.remove('shadowing-btn--recording');
+    liveListenBtn.innerHTML = `${MIC_ICON} Escuchar y traducir`;
+    liveStatus.textContent = '';
+  }
+
+  function setLiveListening() {
+    isLiveListening = true;
+    liveListenBtn.classList.add('shadowing-btn--recording');
+    liveListenBtn.innerHTML = `<span class="pronunciation-btn__dot" aria-hidden="true"></span> Detener`;
+    liveStatus.textContent = 'Escuchando…';
+  }
+
+  // Defensive stop used whenever another feature needs the microphone —
+  // mirrors stopSummaryActive()/stopConversationActive().
+  function stopLiveListen() {
+    if (isLiveListening) { LiveListen.stop(); }
+    setLiveIdle();
+  }
+
+  function updateLiveClearBtn() {
+    liveClearBtn.classList.toggle('hidden', liveEntries.length === 0);
+  }
+
+  function renderLiveEntry(entry) {
+    liveList.classList.remove('hidden');
+    const div = document.createElement('div');
+    div.className = 'live-entry';
+    div.id = `liveEntry-${entry.id}`;
+    div.innerHTML = `
+      <p class="live-entry__en">${esc(entry.en)}</p>
+      <p class="live-entry__es live-entry__es--pending">Traduciendo…</p>`;
+    liveList.appendChild(div);
+    liveList.scrollTop = liveList.scrollHeight;
+    updateLiveClearBtn();
+  }
+
+  function updateLiveEntryDom(entry) {
+    const div = document.getElementById(`liveEntry-${entry.id}`);
+    if (!div) return;
+    const esEl = div.querySelector('.live-entry__es');
+    esEl.textContent = entry.es;
+    esEl.classList.remove('live-entry__es--pending');
+    esEl.classList.toggle('live-entry__es--error', entry.error);
+  }
+
+  // Processes liveQueue one entry at a time — only ever one translation
+  // request in flight, so results always land in the order phrases arrived.
+  async function processLiveQueue() {
+    if (liveProcessing) return;
+    const entry = liveQueue.shift();
+    if (!entry) return;
+
+    liveProcessing = true;
+    try {
+      entry.es = await LiveTranslateApi.translate(entry.en);
+    } catch (err) {
+      entry.error = true;
+      entry.es = err.code === 'NO_API_KEY'
+        ? 'Configura tu API key para traducir.'
+        : 'Error al traducir.';
+    }
+    updateLiveEntryDom(entry);
+    liveProcessing = false;
+    processLiveQueue();
+  }
+
+  function enqueuePhrase(text) {
+    const entry = { id: ++liveIdSeq, en: text, es: null, error: false };
+    liveEntries.push(entry);
+    renderLiveEntry(entry);
+    liveQueue.push(entry);
+    processLiveQueue();
+  }
+
+  liveListenBtn.addEventListener('click', () => {
+    if (!LiveListen.isSupported()) return;
+
+    if (isLiveListening) {
+      LiveListen.stop();
+      setLiveIdle();
+      return;
+    }
+
+    if (!Storage.getApiKey()) { openSettings(); return; }
+
+    if (Speech.isActive()) { Speech.stop(); updateSpeechUI(); }
+    if (isShadowing) { Shadowing.stopActive(); setShadowingIdle(); clearShadowingHighlights(); }
+    stopSummaryActive();
+    stopConversationActive();
+
+    setLiveListening();
+    LiveListen.start(
+      phrase => enqueuePhrase(phrase),
+      err => {
+        setLiveIdle();
+        liveStatus.textContent = err.message;
+      }
+    );
+  });
+
+  liveClearBtn.addEventListener('click', () => {
+    liveEntries = [];
+    liveQueue   = [];
+    liveList.innerHTML = '';
+    liveList.classList.add('hidden');
+    updateLiveClearBtn();
   });
 
   // ─────────────────────────────────────────────────────────

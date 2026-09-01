@@ -1017,6 +1017,76 @@ body {
   color: var(--text);
 }
 
+/* ── Live listen & translate (Etapa 4) ───────────────────── */
+.live-section {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.live-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.live-header__title {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+
+.live-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.live-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.live-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.8rem;
+}
+
+.live-entry__en {
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.live-entry__es {
+  font-size: 0.88rem;
+  color: var(--accent);
+}
+
+.live-entry__es--pending {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.live-entry__es--error {
+  color: #ff6b6b;
+  font-style: italic;
+}
+
 /* ── Mobile (≤ 600 px) ───────────────────────────────────── */
 @media (max-width: 600px) {
 
@@ -1082,6 +1152,11 @@ body {
   /* Barra de speech: padding reducido */
   .speech-bar {
     padding: 0.5rem 0.75rem;
+  }
+
+  /* Escuchar y traducir: padding reducido, misma lógica que speech-bar */
+  .live-section {
+    padding: 0.75rem 0.9rem;
   }
 
   .speech-select {
